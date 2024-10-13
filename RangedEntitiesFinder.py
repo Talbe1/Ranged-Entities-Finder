@@ -1,13 +1,21 @@
-from random import randint
+import multiprocessing
+import threading
+import time
 
+from fontTools.unicodedata import block
 from geopy import distance as gpy_distance
 import pandas as pd
 import math
 import numpy as np
 from datetime import datetime, timedelta
 import random as rand
+import matplotlib
+import matplotlib.pyplot as plt
 
 class ranged_entity_finder():
+    display_fig = plt.figure(1)
+    plotter = display_fig.add_subplot(111, projection="3d")
+
     '''
     Calculates the distance between two gives given points
     on Earth. Each points consists of three values,
@@ -68,11 +76,11 @@ class ranged_entity_finder():
 
         # Removing (dropping) the data about the target from total_df to make working with the data easier.
         # The target might have been dropped since a previous user input during runtime.
-        total_df = total_df[total_df["id"] != entity_id_to_filter]
-        
+        non_target_entities = total_df[total_df["id"] != entity_id_to_filter]
+
         # Saving occurrences of entities crossing paths with the target without timestamp relation.
         # Grouping according to timestamps is done later.
-        path_crosses = total_df.merge(
+        path_crosses = non_target_entities.merge(
             sus_df[["lat", "long", "height"]],
             on=["lat", "long", "height"])
 
@@ -83,7 +91,6 @@ class ranged_entity_finder():
 
         # Grouping the path crosses according to timestamps (by rising order), latitude, longitude, and height.
         path_crosses_grouped = path_crosses.groupby(by=["ts", "lat", "long", "height"])[["id"]].apply(dict).dropna()
-        
         # Storing the coordinates (as points) as a Series of dictionary of tuples, stored in sus DataFrame.
         path_points_sus = sus_df.groupby(by=["ts"])[["lat", "long", "height"]].apply(dict)
 
@@ -131,6 +138,8 @@ class ranged_entity_finder():
                 print(*list(current_entities[1].values())[0], sep=", ", end=' ')
                 print(f"is/are close to target ({round(distance_calculated, 3)} km)!\n" 
                     + f"Entity(ies) coordinates:\t{entities_location_rounded}\nTarget coordinates:\t\t{sus_location_rounded}\n")
+
+        ranged_entity_finder.update_figure(non_target_entities, sus_df)
 
         return True
 
@@ -303,5 +312,43 @@ class ranged_entity_finder():
 
             all_entities = pd.concat([all_entities, new_entity_data]).reset_index(drop=True)
 
+        # Rounding coordinate data as a result of an issue that has to do with Pandas's merge function,
+        # which has a precision issue with float numbers with many digits (code failed with 6, didn't test 5) after the decimal place.
+        all_entities[['lat', 'long', 'height']] = all_entities[['lat', 'long', 'height']].round(4)
+        sus_path[['lat', 'long', 'height']] = sus_path[['lat', 'long', 'height']].round(4)
+
         # Returning DataFrames in a tuple.
         return (all_entities, sus_path)
+
+    '''
+    Used for displaying the paths of entities in 3D.
+    Uses X, Y, Z axis instead of showing the paths around Earth
+    to make things simpler.
+    '''
+    @staticmethod
+    def update_figure(all_entities: pd.DataFrame, sus_entity: pd.DataFrame):
+        #ranged_entity_finder.display_fig.clf()
+
+        #ranged_entity_finder.display_fig = plt.figure()
+
+        # Latitude in this code is considered to be X axis.
+        # Longitude in this code is considered to be Y axis.
+        # Height in this code is considered to be Z axis.
+
+        # Non target coordinates.
+        lat_values = all_entities["lat"]
+        long_values = all_entities["long"]
+        height_values = all_entities["height"]
+
+        # Target coordinates.
+        sus_lats = sus_entity["lat"]
+        sus_longs = sus_entity["long"]
+        sus_heights = sus_entity["height"]
+
+        # Plotting data of entities which aren't the target.
+        ranged_entity_finder.plotter.scatter(lat_values, long_values, height_values)
+        # Plotting data of the target entity.
+        ranged_entity_finder.plotter.scatter(sus_lats, sus_longs, sus_heights)
+
+        # todo: find out why show doesn't work a second time after closing the figure window.
+        plt.show()

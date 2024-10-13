@@ -10,7 +10,7 @@ if __name__ == "__main__":
     num_entities = 5
     num_tracks = 10
 
-    (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, True)
+    (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, False)
 
     print("--- Enter max distance from target in km (or enter 's' to quit, or 'r' to generate new data) ---")
 
@@ -21,15 +21,14 @@ if __name__ == "__main__":
 
         if max_distance_from_target == 'r':
             print("Generating new data...")
-            (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, True)
+            (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, False)
             continue
 
         try:
             res = ranged_entity_finder.locate_closest_entities_to_target(total_df, sus_df, float(max_distance_from_target))
+            if not res:
+                print("Data invalid or no path crosses were found! Generating new data...")
+                (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, False)
 
         except ValueError as ex:
             print(ex)
-
-        if not res:
-            print("Data invalid or no path crosses were found! Generating new data...")
-            (total_df, sus_df) = rEF.generate_entities_paths(num_entities, num_tracks, True)
